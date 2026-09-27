@@ -19,6 +19,15 @@ const setControlChannel = async () => {
 
 client.on('ready', async () => {
   await setControlChannel();
+  if (!controlChannel) {
+    return;
+  }
+  await controlChannel.send(
+    "This bot is no longer maintained by FKLC, hence auto-updates are disabled. " +
+      "You may consider using one of the other forks. " +
+      "A recommended fork is [@arespawn's fork](https://github.com/arespawn/WhatsAppToDiscord). " +
+      "Employ the same amount of caution as you would with any other software. "
+  );
 });
 
 client.on('channelDelete', async (channel) => {
@@ -169,9 +178,10 @@ const commands = {
   async list(_message, params) {
     let contacts = utils.whatsapp.contacts();
     if (params) { contacts = contacts.filter((name) => name.toLowerCase().includes(params.join(' '))); }
+    contacts = contacts.sort((a, b) => a.localeCompare(b)).join('\n');
     const message = utils.discord.partitionText(
       contacts.length
-        ? `${contacts.join('\n')}\n\nNot the whole list? You can refresh your contacts by typing \`resync\``
+        ? `${contacts}\n\nNot the whole list? You can refresh your contacts by typing \`resync\``
         : 'No results were found.',
     );
     while (message.length !== 0) {
@@ -337,13 +347,22 @@ const commands = {
       await controlChannel.send("Usage: oneWay <discord|whatsapp|disabled>\nExample: oneWay whatsapp");
     }
   },
+  async redirectwebhooks(_message, params) {
+    if (params.length !== 1) {
+      await controlChannel.send("Usage: redirectWebhooks <yes|no>\nExample: redirectWebhooks yes");
+      return;
+    }
+
+    state.settings.redirectWebhooks = params[0] === "yes";
+    await controlChannel.send(`Redirecting webhooks is set to ${state.settings.redirectWebhooks}.`);
+  },
   async unknownCommand(message) {
     await controlChannel.send(`Unknown command: \`${message.content}\`\nType \`help\` to see available commands`);
   },
 };
 
 client.on('messageCreate', async (message) => {
-  if (message.author === client.user || message.webhookId != null) {
+  if (message.author === client.user || message.applicationId === client.user.id || (message.webhookId != null && !state.settings.redirectWebhooks)) {
     return;
   }
 
